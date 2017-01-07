@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2014 Adafruit Industries
+ */
 package com.worsham.arduinosynth.bluetooth;
 
 import android.bluetooth.BluetoothAdapter;
