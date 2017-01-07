@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    tools:context="com.worsham.arduinosynth.SynthActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/device_name_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Device"
+            android:textSize="30sp"/>
+
+        <Button
+            android:id="@+id/middle_c_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="C"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/d_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="D"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/e_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="E"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/f_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="F"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/g_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="G"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/a_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="A"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/b_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="B"
+            android:onClick="playTone"/>
+
+        <Button
+            android:id="@+id/high_c_tone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="C"
+            android:onClick="playTone"/>
+
+    </LinearLayout>
+</RelativeLayout>
