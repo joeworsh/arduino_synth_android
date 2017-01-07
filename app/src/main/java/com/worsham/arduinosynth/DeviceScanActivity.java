@@ -21,16 +21,17 @@ import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
-import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.ParcelUuid;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -40,8 +41,13 @@ import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.worsham.arduinosynth.bluetooth.BluetoothUtil;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Activity for scanning and displaying available Bluetooth LE devices.
@@ -84,10 +90,11 @@ public class DeviceScanActivity extends ListActivity
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
-        if (requestCode == 1 && permissions.length == grantResults.length)
-        {
+        if (requestCode == 1 && permissions.length == grantResults.length) {
             initBluetooth();
             scanBluetooth();
+        } else {
+            Toast.makeText(this, R.string.no_permissions, Toast.LENGTH_LONG);
         }
     }
 
@@ -137,55 +144,13 @@ public class DeviceScanActivity extends ListActivity
     }
 
     /**
-     * Called to create the menu when selected.
-     * @param menu the menu to created
-     * @return true if created successfully
-     */
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu)
-    {
-        getMenuInflater().inflate(R.menu.main, menu);
-        if (!mScanning) {
-            menu.findItem(R.id.menu_stop).setVisible(false);
-            menu.findItem(R.id.menu_scan).setVisible(true);
-            menu.findItem(R.id.menu_refresh).setActionView(null);
-        } else {
-            menu.findItem(R.id.menu_stop).setVisible(true);
-            menu.findItem(R.id.menu_scan).setVisible(false);
-            menu.findItem(R.id.menu_refresh).setActionView(
-                    R.layout.actionbar_indeterminate_progress);
-        }
-        return true;
-    }
-
-    /**
-     * Called when a menu item is selected from the menu. The
-     * menu is used to support scanning of bluetooth devices.
-     * @param item the menu item that was selected.
-     * @return true if selected successfully
-     */
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item)
-    {
-        switch (item.getItemId()) {
-            case R.id.menu_scan:
-                mLeDeviceListAdapter.clear();
-                scanLeDevice(true);
-                break;
-            case R.id.menu_stop:
-                scanLeDevice(false);
-                break;
-        }
-        return true;
-    }
-
-    /**
      * Called when the application is returned to after being paused or started for the first time?.
      */
     @Override
     protected void onResume()
     {
         super.onResume();
+        scanLeDevice(true);
     }
 
     /**
@@ -267,7 +232,14 @@ public class DeviceScanActivity extends ListActivity
                 }
             }, SCAN_PERIOD);
             mScanning = true;
-            mBluetoothAdapter.getBluetoothLeScanner().startScan(leScanCallback);
+            ScanFilter filter = (new ScanFilter.Builder())
+                    .setServiceUuid(new ParcelUuid(BluetoothUtil.UART_UUID))
+                    .build();
+            List<ScanFilter> filters = new ArrayList<>();
+            filters.add(filter);
+            ScanSettings settings = (new ScanSettings.Builder())
+                    .build();
+            mBluetoothAdapter.getBluetoothLeScanner().startScan(filters, settings, leScanCallback);
         } else {
             mScanning = false;
             mBluetoothAdapter.getBluetoothLeScanner().stopScan(leScanCallback);
@@ -279,12 +251,14 @@ public class DeviceScanActivity extends ListActivity
     private class LeDeviceListAdapter extends BaseAdapter
     {
         private ArrayList<BluetoothDeviceHolder> mLeDevices;
+        private Map<String, ViewHolder> viewMap;
         private LayoutInflater mInflator;
 
         public LeDeviceListAdapter()
         {
             super();
-            mLeDevices = new ArrayList<BluetoothDeviceHolder>();
+            mLeDevices = new ArrayList<>();
+            viewMap = new HashMap<>();
             mInflator = DeviceScanActivity.this.getLayoutInflater();
         }
 
@@ -295,12 +269,46 @@ public class DeviceScanActivity extends ListActivity
             }
         }
 
+        /**
+         * Return true if the given address is already in the list.
+         * @param address the address of the device to search for
+         * @return true if it is in the list, false otherwise
+         */
+        public boolean hasDevice(String address)
+        {
+            for(BluetoothDeviceHolder holder : mLeDevices)
+            {
+                if (address.equals(holder.device.getAddress()))
+                    return true;
+            }
+            return false;
+        }
+
+        /**
+         * Return the device holder of the given address.
+         * @param address the address of the holder to retrieve
+         * @return the device holder for this device address
+         */
+        public BluetoothDeviceHolder getDeviceHolder(String address)
+        {
+            for(BluetoothDeviceHolder holder : mLeDevices)
+            {
+                if (address.equals(holder.device.getAddress()))
+                    return holder;
+            }
+            return null;
+        }
+
         public BluetoothDeviceHolder getDevice(int position) {
             return mLeDevices.get(position);
         }
-        public void clear() {
+
+        public void clear()
+        {
             mLeDevices.clear();
+            viewMap.clear();
         }
+
         @Override
         public int getCount() {
             return mLeDevices.size();
@@ -334,6 +342,9 @@ public class DeviceScanActivity extends ListActivity
             else
                 viewHolder.deviceName.setText(R.string.unknown_device);
             viewHolder.deviceAddress.setText(device.getAddress());
+
+            viewMap.put(device.getAddress(), viewHolder);
+
             return view;
         }
     }
@@ -365,10 +376,20 @@ public class DeviceScanActivity extends ListActivity
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    BluetoothDeviceHolder holder = new BluetoothDeviceHolder();
+                    BluetoothDeviceHolder holder;
+                    boolean newDevice = false;
+                    if (mLeDeviceListAdapter.hasDevice(result.getDevice().getAddress())) {
+                        holder = mLeDeviceListAdapter.getDeviceHolder(result.getDevice().getAddress());
+                    }
+                    else {
+                        newDevice = true;
+                        holder = new BluetoothDeviceHolder();
+                    }
+
                     holder.device = result.getDevice();
                     holder.scanRecord = result.getScanRecord();
-                    mLeDeviceListAdapter.addDevice(holder);
+                    if (newDevice)
+                        mLeDeviceListAdapter.addDevice(holder);
                     mLeDeviceListAdapter.notifyDataSetChanged();
                 }
             });
