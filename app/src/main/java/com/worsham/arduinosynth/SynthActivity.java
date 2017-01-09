@@ -1,9 +1,12 @@
 package com.worsham.arduinosynth;
 
+import android.app.Activity;
 import android.content.Intent;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.worsham.arduinosynth.bluetooth.BluetoothLeUart;
@@ -12,7 +15,7 @@ import com.worsham.arduinosynth.bluetooth.BluetoothLeUart;
  * Android activity to send Bluetooth UART synthesizer packets
  * to a Bluetooth Arduino Synthesizer.
  */
-public class SynthActivity extends AppCompatActivity
+public class SynthActivity extends Activity implements AdapterView.OnItemSelectedListener
 {
     private final static String TAG = SynthActivity.class.getSimpleName();
 
@@ -45,6 +48,15 @@ public class SynthActivity extends AppCompatActivity
 
         // put the name of the device into activity
         ((TextView) findViewById(R.id.device_name_view)).setText(deviceName);
+
+        // load the available octaves into the device
+        Spinner spinner = (Spinner) findViewById(R.id.octave_spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+                R.array.octave_spinner, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(4);
+        spinner.setOnItemSelectedListener(this);
     }
 
     /**
@@ -86,6 +98,30 @@ public class SynthActivity extends AppCompatActivity
     }
 
     /**
+     * When an item in the octave spinner is selected, set the octave on the BT device.
+     * @param parent
+     * @param view
+     * @param pos
+     * @param id
+     */
+    public void onItemSelected(AdapterView<?> parent, View view,
+                               int pos, long id) {
+        // An item was selected. You can retrieve the selected item using
+        // parent.getItemAtPosition(pos)
+        String octaveStr = (String) parent.getItemAtPosition(pos);
+        byte newOctave = Byte.parseByte(octaveStr);
+        transmitOctave(newOctave);
+    }
+
+    /**
+     * Respond to nothing be selected in the spinner.
+     * @param parent
+     */
+    public void onNothingSelected(AdapterView<?> parent) {
+        // do nothing
+    }
+
+    /**
      * Called to the playtone of the associated button that has been clicked.
      * @param view the clicked view item
      */
@@ -109,14 +145,45 @@ public class SynthActivity extends AppCompatActivity
         buffer[2] = note;
 
         // the last byte in the packet is the checksum
-        byte xsum = 0;
-        for(int i = 0; i < buffer.length - 1; i++)
-            xsum += buffer[i];
-        xsum = (byte) ~xsum;
-        buffer[3] = xsum;
+        computeChecksum(buffer, 3);
 
         // send the packet to the UART connection
         uart.send(buffer);
+    }
+
+    /**
+     * Transmit the specified octave in a byte message to the BT device.
+     * @param octave the new octave of the synth
+     */
+    private void transmitOctave(byte octave)
+    {
+        // encode the packet with the octave
+        byte[] buffer = new byte[4];
+        buffer[0] = '!';
+        buffer[1] = 'O';
+        buffer[2] = octave;
+
+        // the last byte in the packet is the checksum
+        computeChecksum(buffer, 3);
+
+        // send the packet to the UART connection
+        uart.send(buffer);
+    }
+
+    /**
+     * Compute the checksum of the buffer up to the specified position
+     * and then put the checksum in the checksum position.
+     * @param buffer the buffer to compute
+     * @param checksumPosition the position of the checksum in the buffer
+     */
+    private void computeChecksum(byte[] buffer, int checksumPosition)
+    {
+        // the last byte in the packet is the checksum
+        byte xsum = 0;
+        for(int i = 0; i < checksumPosition; i++)
+            xsum += buffer[i];
+        xsum = (byte) ~xsum;
+        buffer[checksumPosition] = xsum;
     }
 
     /**
